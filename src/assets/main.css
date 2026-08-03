@@ -241,12 +241,26 @@ button:disabled {
 
 .quick-regions {
   display: flex;
+  width: 100%;
+  min-height: 28px;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  margin-top: 14px;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0 4px;
   color: #8b95a1;
   font-size: 0.76rem;
+}
+
+.quick-regions-label {
+  flex: 0 0 auto;
+  color: #6b7684;
+  font-weight: 700;
+}
+
+.quick-regions-empty {
+  color: #b0b8c1;
+  font-size: 0.72rem;
 }
 
 .quick-regions button {
@@ -265,6 +279,37 @@ button:disabled {
 .quick-regions button:hover {
   background: var(--blue-soft);
   color: var(--blue);
+}
+
+.recent-region-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #e9edf2;
+  transition: background 150ms ease;
+}
+
+.recent-region-chip:hover {
+  background: var(--blue-soft);
+}
+
+.quick-regions .recent-region-chip > button {
+  background: transparent;
+}
+
+.quick-regions .recent-region-chip > button:first-child {
+  padding: 6px 4px 6px 10px;
+}
+
+.quick-regions .recent-region-chip .remove-recent-button {
+  padding: 5px 8px 6px 3px;
+  color: #8b95a1;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.quick-regions .recent-region-chip .remove-recent-button:hover {
+  color: #f04452;
 }
 
 .content-grid {
@@ -795,8 +840,8 @@ footer a {
     flex: 0 0 auto;
     padding: 22px 0 11px;
     transition:
-      opacity 700ms ease,
-      transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 1300ms ease,
+      transform 1650ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .hero-kicker {
@@ -817,10 +862,11 @@ footer a {
   .search-area {
     width: min(610px, 100%);
     flex: 0 0 auto;
-    margin-bottom: 13px;
+    margin-top: 14px;
+    margin-bottom: 24px;
     transition:
-      opacity 700ms ease,
-      transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 1300ms ease,
+      transform 1650ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .search-box {
@@ -838,7 +884,7 @@ footer a {
   }
 
   .quick-regions {
-    margin-top: 6px;
+    margin-top: 10px;
   }
 
   .app-shell:not(.is-ready) .hero,
@@ -851,19 +897,20 @@ footer a {
     min-height: 0;
     flex: 1 1 auto;
     gap: 16px;
+    margin-bottom: 16px;
     opacity: 0;
     pointer-events: none;
     transform: translateY(26px) scale(0.99);
     transition:
-      opacity 620ms ease,
-      transform 760ms cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 1350ms ease,
+      transform 1500ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .app-shell.is-ready .content-grid {
     opacity: 1;
     pointer-events: auto;
     transform: none;
-    transition-delay: 210ms;
+    transition-delay: 480ms;
   }
 
   .map-card,
@@ -973,7 +1020,7 @@ footer a {
     flex: 0 0 auto;
     padding: 6px 4px 0;
     opacity: 0;
-    transition: opacity 500ms ease 420ms;
+    transition: opacity 900ms ease 950ms;
   }
 
   .app-shell.is-ready footer {

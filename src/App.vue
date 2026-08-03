@@ -188,6 +188,18 @@ const openSavedRegion = (item) => {
   if (province) selectDistrict(province, item.district)
 }
 
+const removeRecentRegion = (target) => {
+  recentRegions.value = recentRegions.value.filter(
+    (item) => item.provinceId !== target.provinceId || item.district !== target.district,
+  )
+
+  if (recentRegions.value.length) {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentRegions.value))
+  } else {
+    localStorage.removeItem(RECENT_KEY)
+  }
+}
+
 const toggleFavorite = () => {
   if (!selectedProvince.value || !selectedDistrict.value) return
   const target = { provinceId: selectedProvince.value.id, district: selectedDistrict.value }
@@ -240,7 +252,7 @@ const handleSearchShortcut = (event) => {
 onMounted(() => {
   loadSearchIndex()
   document.addEventListener('keydown', handleSearchShortcut)
-  const introDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 520
+  const introDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800
   introTimer = window.setTimeout(() => {
     isIntroComplete.value = true
   }, introDelay)
@@ -291,16 +303,32 @@ onUnmounted(() => {
         </ul>
       </div>
 
-      <div v-if="favorites.length || recentRegions.length" class="quick-regions">
-        <span>{{ favorites.length ? '즐겨찾는 지역' : '최근 본 지역' }}</span>
-        <button
+      <div class="quick-regions">
+        <span class="quick-regions-label">{{
+          favorites.length ? '즐겨찾는 지역' : '최근 본 지역'
+        }}</span>
+        <span v-if="!favorites.length && !recentRegions.length" class="quick-regions-empty">
+          아직 둘러본 지역이 없어요
+        </span>
+        <template
           v-for="item in (favorites.length ? favorites : recentRegions).slice(0, 4)"
           :key="`${item.provinceId}-${item.district}`"
-          type="button"
-          @click="openSavedRegion(item)"
         >
-          {{ item.district }}
-        </button>
+          <button v-if="favorites.length" type="button" @click="openSavedRegion(item)">
+            {{ item.district }}
+          </button>
+          <span v-else class="recent-region-chip">
+            <button type="button" @click="openSavedRegion(item)">{{ item.district }}</button>
+            <button
+              class="remove-recent-button"
+              type="button"
+              :aria-label="`${item.district} 최근 기록 삭제`"
+              @click="removeRecentRegion(item)"
+            >
+              ×
+            </button>
+          </span>
+        </template>
       </div>
     </section>
 
@@ -322,7 +350,7 @@ onUnmounted(() => {
             </nav>
             <h2 id="map-title">{{ mapGuide }}</h2>
           </div>
-          <span class="live-pill"><i></i> LIVE</span>
+          <span class="live-pill"><i></i> 지역 위에 마우스를 올려보세요</span>
         </div>
 
         <div class="map-stage" :class="{ 'is-drilled': selectedProvince }">
@@ -353,7 +381,7 @@ onUnmounted(() => {
             <span aria-hidden="true">←</span> 전국 지도
           </button>
         </div>
-        <p class="map-hint"><span aria-hidden="true">↗</span> 지역 위에 마우스를 올려보세요</p>
+        <!-- <p class="map-hint"><span aria-hidden="true">↗</span> 지역 위에 마우스를 올려보세요</p> -->
       </section>
 
       <aside class="weather-panel" aria-live="polite">
@@ -432,7 +460,7 @@ onUnmounted(() => {
 
         <div v-else class="panel-state empty-state">
           <span class="state-emoji" aria-hidden="true">🗺️</span>
-          <strong>지역을 하나 골라보세요</strong>
+          <strong>지역을 선택해주세요</strong>
           <p>지도를 누르면 실시간 날씨와<br />오늘의 생활 팁을 보여드려요.</p>
           <button type="button" @click="useMyLocation">내 위치 날씨 보기</button>
         </div>

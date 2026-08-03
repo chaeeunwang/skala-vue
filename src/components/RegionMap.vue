@@ -1,6 +1,18 @@
 <script setup>
 import { nextTick, ref, watch } from 'vue'
 
+const DOKDO_GEOMETRY = {
+  '전국_시도_경계.svg': {
+    region: '경상북도',
+    path: ' M 743.5 164 L 746.2 160.8 L 749.6 162.4 L 749 166.3 L 745.6 167.2 Z M 752 169.2 L 754.4 167 L 757 168.7 L 756.1 171.8 L 753 172.1 Z',
+  },
+  '경상북도_시군구_경계.svg': {
+    region: '울릉군',
+    path: ' M 699 35 L 702.4 31 L 706.8 33.1 L 706 38 L 701.6 39.2 Z M 710 42 L 713 39.2 L 716.3 41.3 L 715.2 45.3 L 711.2 45.7 Z',
+    label: { x: 719, y: 48 },
+  },
+}
+
 const props = defineProps({
   file: { type: String, required: true },
   activeName: { type: String, default: '' },
@@ -78,6 +90,23 @@ const loadMap = async () => {
     const text = await response.text()
     const documentNode = new DOMParser().parseFromString(text, 'image/svg+xml')
     const svg = documentNode.documentElement
+    const dokdo = DOKDO_GEOMETRY[props.file]
+    const parentRegion = dokdo && svg.querySelector(`path[id="${dokdo.region}"]`)
+    if (parentRegion)
+      parentRegion.setAttribute('d', `${parentRegion.getAttribute('d')}${dokdo.path}`)
+    if (dokdo?.label) {
+      const label = documentNode.createElementNS('http://www.w3.org/2000/svg', 'text')
+      label.setAttribute('x', dokdo.label.x)
+      label.setAttribute('y', dokdo.label.y)
+      label.setAttribute('class', 'dokdo-label')
+      label.setAttribute('fill', '#6b7684')
+      label.setAttribute('font-size', '11')
+      label.setAttribute('font-weight', '800')
+      label.setAttribute('pointer-events', 'none')
+      label.setAttribute('aria-hidden', 'true')
+      // label.textContent = '독도'
+      svg.querySelector('g')?.append(label)
+    }
     svg.removeAttribute('width')
     svg.removeAttribute('height')
     svg.setAttribute('aria-label', '한국 행정구역 선택 지도')
