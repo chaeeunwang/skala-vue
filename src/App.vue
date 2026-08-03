@@ -12,6 +12,7 @@ import { getCurrentWeather, getWeatherForRegion } from './services/openWeather'
 
 const RECENT_KEY = 'onul-weather-recent'
 const FAVORITE_KEY = 'onul-weather-favorites'
+const MIN_WEATHER_LOADING_MS = 1100
 
 const selectedProvince = ref(null)
 const selectedDistrict = ref('')
@@ -25,6 +26,7 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const isLocating = ref(false)
 const isIntroComplete = ref(false)
+const isTypographyReady = ref(false)
 const recentRegions = ref(readStorage(RECENT_KEY))
 const favorites = ref(readStorage(FAVORITE_KEY))
 let requestSequence = 0
@@ -153,17 +155,25 @@ const updateActivePosition = (region) => {
   if (region?.name === selectedDistrict.value) selectedRegionAnchor.value = region
 }
 
+const waitForMinimumLoading = async (startedAt) => {
+  const remaining = MIN_WEATHER_LOADING_MS - (performance.now() - startedAt)
+  if (remaining > 0) await new Promise((resolve) => window.setTimeout(resolve, remaining))
+}
+
 const loadWeather = async (province, district) => {
   const sequence = ++requestSequence
+  const startedAt = performance.now()
   isLoading.value = true
   errorMessage.value = ''
 
   try {
     const result = await getWeatherForRegion(district, province)
+    await waitForMinimumLoading(startedAt)
     if (sequence !== requestSequence) return
     weather.value = result
     addRecent(province, district)
   } catch (error) {
+    await waitForMinimumLoading(startedAt)
     if (sequence === requestSequence) errorMessage.value = error.message
   } finally {
     if (sequence === requestSequence) isLoading.value = false
@@ -252,10 +262,20 @@ const handleSearchShortcut = (event) => {
 onMounted(() => {
   loadSearchIndex()
   document.addEventListener('keydown', handleSearchShortcut)
-  const introDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800
-  introTimer = window.setTimeout(() => {
-    isIntroComplete.value = true
-  }, introDelay)
+
+  const beginIntro = () => {
+    isTypographyReady.value = true
+    const introDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800
+    introTimer = window.setTimeout(() => {
+      isIntroComplete.value = true
+    }, introDelay)
+  }
+
+  if (document.fonts?.load) {
+    document.fonts.load('800 48px "Noto Sans KR"', '어디의 날씨가 궁금하세요?').then(beginIntro, beginIntro)
+  } else {
+    beginIntro()
+  }
 })
 
 onUnmounted(() => {
@@ -265,7 +285,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="app-shell" :class="{ 'is-ready': isIntroComplete }">
+  <main
+    class="app-shell"
+    :class="{
+      'is-ready': isIntroComplete,
+      'is-typography-ready': isTypographyReady,
+    }"
+  >
     <section class="hero">
       <p class="hero-kicker">지도로 만나는 오늘의 하늘</p>
       <h1>어디의 날씨가<br /><span>궁금하세요?</span></h1>
@@ -303,21 +329,32 @@ onUnmounted(() => {
         </ul>
       </div>
 
-      <div class="quick-regions">
-        <span class="quick-regions-label">{{
-          favorites.length ? '즐겨찾는 지역' : '최근 본 지역'
-        }}</span>
-        <span v-if="!favorites.length && !recentRegions.length" class="quick-regions-empty">
-          아직 둘러본 지역이 없어요
-        </span>
-        <template
-          v-for="item in (favorites.length ? favorites : recentRegions).slice(0, 4)"
-          :key="`${item.provinceId}-${item.district}`"
-        >
-          <button v-if="favorites.length" type="button" @click="openSavedRegion(item)">
+      <div class="saved-region-groups">
+        <div class="quick-regions favorite-regions">
+          <span class="quick-regions-label">즐겨찾는 지역</span>
+          <span v-if="!favorites.length" class="quick-regions-empty">
+            아직 즐겨찾는 지역이 없어요
+          </span>
+          <button
+            v-for="item in favorites.slice(0, 4)"
+            :key="`${item.provinceId}-${item.district}`"
+            type="button"
+            @click="openSavedRegion(item)"
+          >
             {{ item.district }}
           </button>
-          <span v-else class="recent-region-chip">
+        </div>
+
+        <div class="quick-regions recent-regions">
+          <span class="quick-regions-label">최근 본 지역</span>
+          <span v-if="!recentRegions.length" class="quick-regions-empty">
+            아직 둘러본 지역이 없어요
+          </span>
+          <span
+            v-for="item in recentRegions.slice(0, 6)"
+            :key="`${item.provinceId}-${item.district}`"
+            class="recent-region-chip"
+          >
             <button type="button" @click="openSavedRegion(item)">{{ item.district }}</button>
             <button
               class="remove-recent-button"
@@ -328,7 +365,7 @@ onUnmounted(() => {
               ×
             </button>
           </span>
-        </template>
+        </div>
       </div>
     </section>
 
@@ -459,10 +496,39 @@ onUnmounted(() => {
         </div>
 
         <div v-else class="panel-state empty-state">
-          <span class="state-emoji" aria-hidden="true">🗺️</span>
-          <strong>지역을 선택해주세요</strong>
-          <p>지도를 누르면 실시간 날씨와<br />오늘의 생활 팁을 보여드려요.</p>
-          <button type="button" @click="useMyLocation">내 위치 날씨 보기</button>
+          <div class="empty-visual" aria-hidden="true">
+            <svg viewBox="0 0 220 128">
+              <circle class="empty-sun" cx="164" cy="35" r="17" />
+              <path
+                class="empty-cloud-back"
+                d="M63 67c3-16 15-27 31-27 12 0 22 6 28 16 4-3 10-5 16-5 15 0 27 12 27 27H61c0-4 1-8 2-11Z"
+              />
+              <path
+                class="empty-cloud-front"
+                d="M42 89c2-13 13-23 27-23 10 0 19 5 24 13 4-3 8-4 13-4 13 0 23 10 23 23H40c0-3 1-6 2-9Z"
+              />
+              <path
+                class="empty-pin"
+                d="M147 72c-13 0-23 10-23 23 0 17 23 32 23 32s23-15 23-32c0-13-10-23-23-23Z"
+              />
+              <circle class="empty-pin-dot" cx="147" cy="95" r="7" />
+            </svg>
+          </div>
+
+          <div class="empty-copy">
+            <small>오늘의 날씨</small>
+            <strong>어느 지역부터 볼까요?</strong>
+            <p>지도에서 지역을 고르면<br />지금 날씨와 생활 팁을 바로 알려드려요.</p>
+          </div>
+
+          <button type="button" @click="useMyLocation">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 21s7-5.1 7-12a7 7 0 1 0-14 0c0 6.9 7 12 7 12Z" />
+              <circle cx="12" cy="9" r="2.5" />
+            </svg>
+            <span>내 위치로 바로 보기</span>
+            <span class="empty-button-arrow" aria-hidden="true">›</span>
+          </button>
         </div>
       </aside>
     </div>
