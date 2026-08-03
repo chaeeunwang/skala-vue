@@ -13,6 +13,11 @@ import { getCurrentWeather, getWeatherForRegion } from './services/openWeather'
 const RECENT_KEY = 'onul-weather-recent'
 const FAVORITE_KEY = 'onul-weather-favorites'
 const MIN_WEATHER_LOADING_MS = 1100
+const featuredRegions = [
+  { provinceId: 'seoul', district: '종로구', label: '서울' },
+  { provinceId: 'busan', district: '해운대구', label: '부산' },
+  { provinceId: 'jeju', district: '제주시', label: '제주' },
+]
 
 const selectedProvince = ref(null)
 const selectedDistrict = ref('')
@@ -198,6 +203,11 @@ const openSavedRegion = (item) => {
   if (province) selectDistrict(province, item.district)
 }
 
+const openFeaturedRegion = (item) => {
+  const province = findProvinceById(item.provinceId)
+  if (province) selectDistrict(province, item.district)
+}
+
 const removeRecentRegion = (target) => {
   recentRegions.value = recentRegions.value.filter(
     (item) => item.provinceId !== target.provinceId || item.district !== target.district,
@@ -272,7 +282,9 @@ onMounted(() => {
   }
 
   if (document.fonts?.load) {
-    document.fonts.load('800 48px "Noto Sans KR"', '어디의 날씨가 궁금하세요?').then(beginIntro, beginIntro)
+    document.fonts
+      .load('800 48px "Noto Sans KR"', '어디의 날씨가 궁금하세요?')
+      .then(beginIntro, beginIntro)
   } else {
     beginIntro()
   }
@@ -497,31 +509,62 @@ onUnmounted(() => {
 
         <div v-else class="panel-state empty-state">
           <div class="empty-visual" aria-hidden="true">
-            <svg viewBox="0 0 220 128">
-              <circle class="empty-sun" cx="164" cy="35" r="17" />
+            <div class="empty-visual-copy">
+              <strong>ONEUL WEATHER</strong>
+              <span>대한민국 날씨를 지도로 한눈에</span>
+            </div>
+            <svg class="empty-visual-mark" viewBox="0 0 220 150">
+              <path class="empty-sky-arc" d="M28 150A192 192 0 0 1 220 0v150Z" />
+              <circle class="empty-sun" cx="164" cy="58" r="24" />
               <path
-                class="empty-cloud-back"
-                d="M63 67c3-16 15-27 31-27 12 0 22 6 28 16 4-3 10-5 16-5 15 0 27 12 27 27H61c0-4 1-8 2-11Z"
+                class="empty-cloud-shadow"
+                d="M105 117c2-25 22-44 48-44 19 0 36 11 43 28 2 0 4-1 7-1 19 0 34 15 34 34h-132c-1-6-1-11 0-17Z"
               />
               <path
                 class="empty-cloud-front"
-                d="M42 89c2-13 13-23 27-23 10 0 19 5 24 13 4-3 8-4 13-4 13 0 23 10 23 23H40c0-3 1-6 2-9Z"
+                d="M87 124c3-25 23-44 49-44 19 0 36 11 43 28 3-1 7-2 10-2 20 0 36 16 36 36H86c0-6 0-12 1-18Z"
               />
-              <path
-                class="empty-pin"
-                d="M147 72c-13 0-23 10-23 23 0 17 23 32 23 32s23-15 23-32c0-13-10-23-23-23Z"
-              />
-              <circle class="empty-pin-dot" cx="147" cy="95" r="7" />
             </svg>
           </div>
 
           <div class="empty-copy">
-            <small>오늘의 날씨</small>
-            <strong>어느 지역부터 볼까요?</strong>
-            <p>지도에서 지역을 고르면<br />지금 날씨와 생활 팁을 바로 알려드려요.</p>
+            <!-- <small><b>01</b><i></i>지역 선택</small> -->
+            <strong>오늘, 어디의 하늘을 <br />살펴볼까요?</strong>
+            <p>원하는 지역을 고르면 <br />지금 날씨부터 생활 팁까지 보여드려요.</p>
           </div>
 
-          <button type="button" @click="useMyLocation">
+          <div class="empty-shortcuts">
+            <span>빠른 시작</span>
+            <div>
+              <button type="button" @click="openFeaturedRegion(featuredRegions[0])">
+                <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <path
+                    d="M25 51h14M28 46h8l-1-18h-6l-1 18Zm2-24h4l-2-11-2 11Zm-6 29h16l3 5H21l3-5Z"
+                  />
+                  <path d="M27 34h10M28 40h8" />
+                </svg>
+                <span>서울 <i aria-hidden="true">›</i></span>
+              </button>
+              <button type="button" @click="openFeaturedRegion(featuredRegions[1])">
+                <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <path
+                    d="M8 45h48M13 45V25m38 20V25M13 32c8 0 14-5 19-13 5 8 11 13 19 13M20 45V31m12 14V20m12 25V31"
+                  />
+                  <path d="M8 50h48" />
+                </svg>
+                <span>부산 <i aria-hidden="true">›</i></span>
+              </button>
+              <button type="button" @click="openFeaturedRegion(featuredRegions[2])">
+                <svg class="jeju-icon" viewBox="0 0 64 64" aria-hidden="true">
+                  <path d="m9 49 15-28 8 6 8-6 15 28Z" />
+                  <path d="m24 21 8 6 8-6 4 8c-5-2-8 0-12 2-4-2-7-4-12-2Z" />
+                </svg>
+                <span>제주 <i aria-hidden="true">›</i></span>
+              </button>
+            </div>
+          </div>
+
+          <button class="empty-location-button" type="button" @click="useMyLocation">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 21s7-5.1 7-12a7 7 0 1 0-14 0c0 6.9 7 12 7 12Z" />
               <circle cx="12" cy="9" r="2.5" />
