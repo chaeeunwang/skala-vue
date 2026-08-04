@@ -77,6 +77,31 @@ const isFavorite = computed(() =>
 const updatedTime = computed(() =>
   weather.value?.observedAt.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }),
 )
+const weatherTheme = computed(() => {
+  const description = weather.value?.description || ''
+
+  if (/비 또는 눈|빗방울 또는 눈날림|진눈깨비|눈/.test(description)) return 'snowy'
+  if (/뇌우|비|이슬비|소나기|빗방울/.test(description)) return 'rainy'
+  if (/구름 조금/.test(description)) return 'partly-cloudy'
+  if (/흐림|구름/.test(description)) return 'cloudy'
+  if (/맑음/.test(description)) return 'clear'
+  if (/안개|박무|연무|황사|먼지|연기|화산재/.test(description)) return 'misty'
+  return 'cloudy'
+})
+const weatherOverview = computed(() => {
+  if (!weather.value) return ''
+
+  const descriptions = {
+    'partly-cloudy': '구름 사이로 햇빛이 비치는 날씨예요. 가벼운 야외 활동을 즐기기 좋아요.',
+    cloudy: '구름이 많아 흐린 하늘이에요. 빛이 약해도 자외선 차단은 잊지 마세요.',
+    rainy: '비가 내리는 날씨예요. 외출할 때 우산과 미끄러운 길을 주의해 주세요.',
+    snowy: '눈이 내리는 날씨예요. 노면이 미끄러울 수 있으니 천천히 이동해 주세요.',
+    clear: '맑고 깨끗한 하늘이에요. 햇볕이 강한 시간에는 자외선에 주의해 주세요.',
+    misty: '공기 중에 안개가 머물러 있어요. 이동할 때 시야를 충분히 확보해 주세요.',
+  }
+
+  return descriptions[weatherTheme.value]
+})
 
 const loadSearchIndex = async () => {
   const groups = await Promise.all(
@@ -381,7 +406,7 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <div class="content-grid">
+    <div class="content-grid" :class="{ 'has-weather': weather && !isLoading && !errorMessage }">
       <section class="map-card" aria-labelledby="map-title">
         <div class="map-card-header">
           <div>
@@ -433,7 +458,14 @@ onUnmounted(() => {
         <!-- <p class="map-hint"><span aria-hidden="true">↗</span> 지역 위에 마우스를 올려보세요</p> -->
       </section>
 
-      <aside class="weather-panel" aria-live="polite">
+      <aside
+        class="weather-panel"
+        :class="{
+          'has-weather': weather && !isLoading && !errorMessage,
+          [`is-${weatherTheme}`]: weather && !isLoading && !errorMessage,
+        }"
+        aria-live="polite"
+      >
         <div v-if="isLoading" class="panel-state loading-state">
           <span class="loader" aria-hidden="true"></span>
           <strong>{{ selectedDistrict || '현재 위치' }}의 하늘을 확인하고 있어요</strong>
@@ -466,20 +498,28 @@ onUnmounted(() => {
               :aria-label="isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'"
               @click="toggleFavorite"
             >
-              {{ isFavorite ? '★' : '☆' }}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"
+                />
+              </svg>
             </button>
           </div>
 
           <div class="temperature-block">
-            <span class="weather-emoji" aria-hidden="true">{{ weather.emoji }}</span>
-            <div>
-              <strong>{{ weather.temp }}<sup>°</sup></strong>
-              <p>{{ weather.description }}</p>
-            </div>
+            <strong>{{ weather.temp }}<sup>°</sup></strong>
+            <p>{{ weather.description }}</p>
           </div>
 
+          <p class="weather-overview">{{ weatherOverview }}</p>
+
           <div class="weather-message">
-            <span aria-hidden="true">💡</span>
+            <span aria-hidden="true">
+              <svg viewBox="0 0 48 48">
+                <path d="M17 35h14M19 40h10M24 5c-8 0-14 6-14 14 0 6 3 9 7 13h14c4-4 7-7 7-13 0-8-6-14-14-14Z" />
+                <path d="M24 1v-3M9 7 6 4m33 3 3-3M4 20H0m48 0h-4" />
+              </svg>
+            </span>
             <p>
               <small>오늘의 한마디</small><strong>{{ weather.message }}</strong>
             </p>
@@ -487,19 +527,42 @@ onUnmounted(() => {
 
           <dl class="weather-metrics">
             <div>
-              <dt>체감</dt>
+              <dt>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M13 5a3 3 0 0 1 6 0v13a7 7 0 1 1-6 0V5Z" />
+                  <path d="M16 10v12" />
+                </svg>
+                <span>체감</span>
+              </dt>
               <dd>{{ weather.feelsLike }}°</dd>
             </div>
             <div>
-              <dt>습도</dt>
+              <dt>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M16 3S8 12 8 19a8 8 0 0 0 16 0c0-7-8-16-8-16Z" />
+                  <path d="M11 20c1 3 3 4 6 4" />
+                </svg>
+                <span>습도</span>
+              </dt>
               <dd>{{ weather.humidity }}%</dd>
             </div>
             <div>
-              <dt>바람</dt>
+              <dt>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M3 11h17c5 0 5-7 1-7-3 0-4 2-4 4M3 16h23c5 0 5 7 1 7-3 0-4-2-4-4M3 21h12" />
+                </svg>
+                <span>바람</span>
+              </dt>
               <dd>{{ weather.windSpeed }}m/s</dd>
             </div>
             <div>
-              <dt>{{ weather.extraMetricLabel }}</dt>
+              <dt>
+                <svg viewBox="0 0 32 32" aria-hidden="true">
+                  <path d="M8 23h16a5 5 0 0 0 0-10 8 8 0 0 0-15-2 6 6 0 0 0-1 12Z" />
+                  <path d="m11 27-1 2m6-2-1 2m6-2-1 2" />
+                </svg>
+                <span>{{ weather.extraMetricLabel }}</span>
+              </dt>
               <dd>{{ weather.extraMetricValue }}</dd>
             </div>
           </dl>

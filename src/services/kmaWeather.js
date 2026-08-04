@@ -142,15 +142,6 @@ const getDescription = (sky, precipitationType) => {
   return { 1: '맑음', 3: '구름 많음', 4: '흐림' }[sky] || '날씨 정보'
 }
 
-const getEmoji = (sky, precipitationType, hour) => {
-  if ([1, 4, 5].includes(precipitationType)) return '🌧️'
-  if ([2, 6].includes(precipitationType)) return '🌨️'
-  if ([3, 7].includes(precipitationType)) return '❄️'
-  if (sky === 1) return hour >= 19 || hour < 6 ? '🌙' : '☀️'
-  if (sky === 3) return '🌤️'
-  return '☁️'
-}
-
 const getMessage = (temp, precipitationType, windSpeed) => {
   if (precipitationType > 0) return '우산을 챙기는 게 마음 편해요.'
   if (temp >= 30) return '물을 자주 마시고, 한낮의 야외 활동은 줄여보세요.'
@@ -218,7 +209,6 @@ export const getKmaCurrentWeather = async (lat, lon, locationName) => {
     humidity,
     windSpeed: windSpeed.toFixed(1),
     description: getDescription(sky, precipitationType),
-    emoji: getEmoji(sky, precipitationType, Number(targetKey.slice(8, 10))),
     message: getMessage(temp, precipitationType, windSpeed),
     extraMetricLabel: '강수량',
     extraMetricValue: formatPrecipitation(values.RN1),

@@ -51,16 +51,6 @@ export const reverseCoordinates = async (lat, lon) => {
   return results[0] ?? null
 }
 
-const getWeatherEmoji = (weatherId, icon) => {
-  if (weatherId >= 200 && weatherId < 300) return '⛈️'
-  if (weatherId >= 300 && weatherId < 600) return '🌧️'
-  if (weatherId >= 600 && weatherId < 700) return '🌨️'
-  if (weatherId >= 700 && weatherId < 800) return '🌫️'
-  if (weatherId === 800) return icon?.endsWith('n') ? '🌙' : '☀️'
-  if (weatherId === 801) return '🌤️'
-  return '☁️'
-}
-
 const getWeatherDescription = (weatherId) => {
   if (weatherId >= 200 && weatherId < 300) return '뇌우'
   if (weatherId >= 300 && weatherId < 400) return '이슬비'
@@ -126,7 +116,6 @@ const getOpenWeatherCurrentWeather = async (lat, lon, locationName) => {
     windSpeed: Number(data.wind?.speed ?? 0).toFixed(1),
     visibility: Math.round((data.visibility ?? 0) / 100) / 10,
     description: getWeatherDescription(condition.id),
-    emoji: getWeatherEmoji(condition.id, condition.icon),
     message: getWeatherMessage(data),
     extraMetricLabel: '가시거리',
     extraMetricValue: `${Math.round((data.visibility ?? 0) / 100) / 10}km`,
