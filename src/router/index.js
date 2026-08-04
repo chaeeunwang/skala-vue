@@ -10,9 +10,10 @@ const router = createRouter({
       component: () => import('../views/WeatherHomeView.vue'),
     },
     {
-      path: '/weather/:cityId',
-      name: 'weather-detail',
-      component: () => import('../views/WeatherDetailView.vue'),
+      path: '/community/:cityId',
+      alias: '/weather/:cityId',
+      name: 'weather-community',
+      component: () => import('../views/WeatherCommunityView.vue'),
       props: true,
     },
     {

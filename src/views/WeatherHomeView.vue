@@ -261,11 +261,11 @@ const toggleFavorite = () => {
   localStorage.setItem(FAVORITE_KEY, JSON.stringify(favorites.value))
 }
 
-const openWeatherDetail = () => {
+const openWeatherCommunity = () => {
   if (!selectedProvince.value || !selectedDistrict.value) return
 
   router.push({
-    name: 'weather-detail',
+    name: 'weather-community',
     params: { cityId: `${selectedProvince.value.id}--${selectedDistrict.value}` },
   })
 }
@@ -505,8 +505,8 @@ onUnmounted(() => {
               <h2>{{ weather.name }}</h2>
             </div>
             <div v-if="selectedDistrict" class="weather-heading-actions">
-              <button class="detail-button" type="button" @click="openWeatherDetail">
-                상세 보기 <span aria-hidden="true">›</span>
+              <button class="detail-button" type="button" @click="openWeatherCommunity">
+                커뮤니티 <span aria-hidden="true">›</span>
               </button>
               <button
                 class="favorite-button"
@@ -613,8 +613,8 @@ onUnmounted(() => {
 
           <div class="empty-copy">
             <small>대한민국 날씨를 지도로 한눈에</small>
-            <strong>오늘, 어디의 하늘을 <br />살펴볼까요?</strong>
-            <p>원하는 지역을 고르면 <br />지금 날씨부터 생활 팁까지 보여드려요.</p>
+            <strong>오늘, 어디의 하늘을 살펴볼까요?</strong>
+            <p>원하는 지역을 선택하시면 <br />현재의 날씨부터 생활 팁까지 보여드려요.</p>
           </div>
 
           <div class="empty-shortcuts">
@@ -627,7 +627,7 @@ onUnmounted(() => {
                   />
                   <path d="M27 34h10M28 40h8" />
                 </svg>
-                <span>서울 <i aria-hidden="true">›</i></span>
+                <span>서울 <i aria-hidden="true"></i></span>
               </button>
               <button type="button" @click="openFeaturedRegion(featuredRegions[1])">
                 <svg viewBox="0 0 64 64" aria-hidden="true">
@@ -636,14 +636,14 @@ onUnmounted(() => {
                   />
                   <path d="M8 50h48" />
                 </svg>
-                <span>부산 <i aria-hidden="true">›</i></span>
+                <span>부산 <i aria-hidden="true"></i></span>
               </button>
               <button type="button" @click="openFeaturedRegion(featuredRegions[2])">
                 <svg class="jeju-icon" viewBox="0 0 64 64" aria-hidden="true">
                   <path d="m9 49 15-28 8 6 8-6 15 28Z" />
                   <path d="m24 21 8 6 8-6 4 8c-5-2-8 0-12 2-4-2-7-4-12-2Z" />
                 </svg>
-                <span>제주 <i aria-hidden="true">›</i></span>
+                <span>제주 <i aria-hidden="true"></i></span>
               </button>
             </div>
           </div>
