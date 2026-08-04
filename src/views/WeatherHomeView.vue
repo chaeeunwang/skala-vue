@@ -96,12 +96,12 @@ const weatherOverview = computed(() => {
   if (!weather.value) return ''
 
   const descriptions = {
-    'partly-cloudy': '구름 사이로 햇빛이 비치는 날씨예요. 가벼운 야외 활동을 즐기기 좋아요.',
-    cloudy: '구름이 많아 흐린 하늘이에요. 빛이 약해도 자외선 차단은 잊지 마세요.',
-    rainy: '비가 내리는 날씨예요. 외출할 때 우산과 미끄러운 길을 주의해 주세요.',
-    snowy: '눈이 내리는 날씨예요. 노면이 미끄러울 수 있으니 천천히 이동해 주세요.',
-    clear: '맑고 깨끗한 하늘이에요. 햇볕이 강한 시간에는 자외선에 주의해 주세요.',
-    misty: '공기 중에 안개가 머물러 있어요. 이동할 때 시야를 충분히 확보해 주세요.',
+    'partly-cloudy': '구름 사이로 햇빛이 비치는 날씨예요.\n가벼운 야외 활동을 즐기기 좋아요.',
+    cloudy: '구름이 많아 흐린 하늘이에요.\n빛이 약해도 자외선 차단은 잊지 마세요.',
+    rainy: '비가 내리는 날씨예요.\n외출할 때 우산과 미끄러운 길을 주의해 주세요.',
+    snowy: '눈이 내리는 날씨예요.\n노면이 미끄러울 수 있으니 천천히 이동해 주세요.',
+    clear: '맑고 깨끗한 하늘이에요.\n햇볕이 강한 시간에는 자외선에 주의해 주세요.',
+    misty: '공기 중에 안개가 머물러 있어요.\n이동할 때 시야를 충분히 확보해 주세요.',
   }
 
   return descriptions[weatherTheme.value]
@@ -336,7 +336,7 @@ onUnmounted(() => {
 
 <template>
   <main
-    class="app-shell"
+    class="app-shell dashboard-home"
     :class="{
       'is-ready': isIntroComplete,
       'is-typography-ready': isTypographyReady,
@@ -344,7 +344,7 @@ onUnmounted(() => {
   >
     <section class="hero">
       <p class="hero-kicker">지도로 만나는 오늘의 하늘</p>
-      <h1>어디의 날씨가<br /><span>궁금하세요?</span></h1>
+      <h1>어디의 날씨가 <span>궁금하세요?</span></h1>
       <p>지역을 검색하거나 지도에서 직접 골라보세요.</p>
     </section>
 
@@ -524,8 +524,8 @@ onUnmounted(() => {
           </div>
 
           <div class="temperature-block">
-            <strong>{{ displayTemperature(weather.temp) }}<sup>°</sup></strong>
-            <p>{{ weather.description }}</p>
+            <strong> {{ displayTemperature(weather.temp) }}<sup>°</sup> </strong>
+            <p class="weather-description">{{ weather.description }}</p>
           </div>
 
           <p class="weather-overview">{{ weatherOverview }}</p>
@@ -533,7 +533,9 @@ onUnmounted(() => {
           <div class="weather-message">
             <span aria-hidden="true">
               <svg viewBox="0 0 48 48">
-                <path d="M17 35h14M19 40h10M24 5c-8 0-14 6-14 14 0 6 3 9 7 13h14c4-4 7-7 7-13 0-8-6-14-14-14Z" />
+                <path
+                  d="M17 35h14M19 40h10M24 5c-8 0-14 6-14 14 0 6 3 9 7 13h14c4-4 7-7 7-13 0-8-6-14-14-14Z"
+                />
                 <path d="M24 1v-3M9 7 6 4m33 3 3-3M4 20H0m48 0h-4" />
               </svg>
             </span>
@@ -566,7 +568,9 @@ onUnmounted(() => {
             <div>
               <dt>
                 <svg viewBox="0 0 32 32" aria-hidden="true">
-                  <path d="M3 11h17c5 0 5-7 1-7-3 0-4 2-4 4M3 16h23c5 0 5 7 1 7-3 0-4-2-4-4M3 21h12" />
+                  <path
+                    d="M3 11h17c5 0 5-7 1-7-3 0-4 2-4 4M3 16h23c5 0 5 7 1 7-3 0-4-2-4-4M3 21h12"
+                  />
                 </svg>
                 <span>바람</span>
               </dt>
@@ -608,7 +612,7 @@ onUnmounted(() => {
           </div>
 
           <div class="empty-copy">
-            <!-- <small><b>01</b><i></i>지역 선택</small> -->
+            <small>대한민국 날씨를 지도로 한눈에</small>
             <strong>오늘, 어디의 하늘을 <br />살펴볼까요?</strong>
             <p>원하는 지역을 고르면 <br />지금 날씨부터 생활 팁까지 보여드려요.</p>
           </div>
