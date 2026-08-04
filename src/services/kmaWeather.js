@@ -1,3 +1,5 @@
+import axios from 'axios'
+
 const KMA_API_URL = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst'
 
 const getServiceKey = () => {
@@ -82,23 +84,32 @@ const getBaseDateTime = (now = new Date()) => {
 const requestForecast = async (lat, lon) => {
   const { nx, ny } = toGrid(lat, lon)
   const { baseDate, baseTime } = getBaseDateTime()
-  const url = new URL(KMA_API_URL)
-  url.search = new URLSearchParams({
-    serviceKey: getServiceKey(),
-    pageNo: '1',
-    numOfRows: '60',
-    dataType: 'JSON',
-    base_date: baseDate,
-    base_time: baseTime,
-    nx: String(nx),
-    ny: String(ny),
-  }).toString()
+  let data
 
-  const response = await fetch(url)
-  const data = await response.json().catch(() => ({}))
+  try {
+    const response = await axios.get(KMA_API_URL, {
+      params: {
+        serviceKey: getServiceKey(),
+        pageNo: '1',
+        numOfRows: '60',
+        dataType: 'JSON',
+        base_date: baseDate,
+        base_time: baseTime,
+        nx: String(nx),
+        ny: String(ny),
+      },
+    })
+    data = response.data
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.response?.header?.resultMsg || '기상청 데이터를 가져오지 못했어요.',
+      { cause: error },
+    )
+  }
+
   const resultCode = data.response?.header?.resultCode
 
-  if (!response.ok || resultCode !== '00') {
+  if (resultCode !== '00') {
     throw new Error(data.response?.header?.resultMsg || '기상청 데이터를 가져오지 못했어요.')
   }
 

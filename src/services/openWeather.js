@@ -1,3 +1,5 @@
+import axios from 'axios'
+
 import { getKmaCurrentWeather } from './kmaWeather'
 import { getRegionCoordinates } from '../data/regionCoordinates'
 
@@ -15,20 +17,22 @@ const getApiKey = () => {
 
 const request = async (path, params) => {
   const url = new URL(path, API_BASE)
-  url.search = new URLSearchParams({ ...params, appid: getApiKey() }).toString()
-
-  const response = await fetch(url)
-  const data = await response.json().catch(() => ({}))
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('API 키를 확인해 주세요. 새 키는 활성화에 시간이 걸릴 수 있어요.')
+  try {
+    const response = await axios.get(url.toString(), {
+      params: { ...params, appid: getApiKey() },
+    })
+    return response.data
+  } catch (error) {
+    if (error.response?.status === 401) {
+      throw new Error('API 키를 확인해 주세요. 새 키는 활성화에 시간이 걸릴 수 있어요.', {
+        cause: error,
+      })
     }
 
-    throw new Error(data.message || '날씨 정보를 가져오지 못했어요.')
+    throw new Error(error.response?.data?.message || '날씨 정보를 가져오지 못했어요.', {
+      cause: error,
+    })
   }
-
-  return data
 }
 
 export const searchCoordinates = async (district, province) => {
