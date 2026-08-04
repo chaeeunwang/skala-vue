@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import RegionMap from '../components/RegionMap.vue'
 import { useTemperature } from '../composables/useTemperature'
@@ -10,18 +9,20 @@ import {
   findProvinceBySourceName,
   provinces,
 } from '../data/regions'
-import { getCurrentWeather, getWeatherForRegion } from '../services/openWeather'
+import { findNearestRegion } from '../data/regionCoordinates'
+import { getCurrentWeather, getWeatherForRegion, reverseCoordinates } from '../services/openWeather'
+import { getCommunityComments } from '../services/community'
 
 const RECENT_KEY = 'onul-weather-recent'
 const FAVORITE_KEY = 'onul-weather-favorites'
-const MIN_WEATHER_LOADING_MS = 1100
+const COMMUNITY_PREVIEW_SYNC_KEY = 'onul-weather-community-sync'
+const MIN_WEATHER_LOADING_MS = 600
 const featuredRegions = [
   { provinceId: 'seoul', district: '종로구', label: '서울' },
   { provinceId: 'busan', district: '해운대구', label: '부산' },
   { provinceId: 'jeju', district: '제주시', label: '제주' },
 ]
 
-const router = useRouter()
 const { displayTemperature } = useTemperature()
 const selectedProvince = ref(null)
 const selectedDistrict = ref('')
@@ -35,11 +36,13 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const isLocating = ref(false)
 const isIntroComplete = ref(false)
-const isTypographyReady = ref(false)
 const recentRegions = ref(readStorage(RECENT_KEY))
 const favorites = ref(readStorage(FAVORITE_KEY))
+const communityPreviewComments = ref([])
+const communityPreviewLoading = ref(false)
 let requestSequence = 0
 let introTimer
+let communityPreviewTimer
 
 function readStorage(key) {
   try {
@@ -81,6 +84,15 @@ const isFavorite = computed(() =>
 const updatedTime = computed(() =>
   weather.value?.observedAt.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' }),
 )
+const communityRegionId = computed(() => {
+  if (!selectedProvince.value || !selectedDistrict.value) return ''
+  return `${selectedProvince.value.id}--${selectedDistrict.value}`
+})
+const communityPreviewLink = computed(() => ({
+  name: 'weather-community',
+  params: { cityId: communityRegionId.value },
+}))
+const communityPreviewPost = computed(() => communityPreviewComments.value[0] || null)
 const weatherTheme = computed(() => {
   const description = weather.value?.description || ''
 
@@ -133,6 +145,7 @@ const goNationwide = () => {
   hoveredRegion.value = null
   selectedRegionAnchor.value = null
   weather.value = null
+  communityPreviewComments.value = []
   errorMessage.value = ''
 }
 
@@ -206,6 +219,7 @@ const loadWeather = async (province, district) => {
     if (sequence !== requestSequence) return
     weather.value = result
     addRecent(province, district)
+    await loadCommunityPreview()
   } catch (error) {
     await waitForMinimumLoading(startedAt)
     if (sequence === requestSequence) errorMessage.value = error.message
@@ -261,13 +275,52 @@ const toggleFavorite = () => {
   localStorage.setItem(FAVORITE_KEY, JSON.stringify(favorites.value))
 }
 
-const openWeatherCommunity = () => {
-  if (!selectedProvince.value || !selectedDistrict.value) return
+const truncateText = (value, maxLength) => {
+  if (!value) return ''
+  return value.length > maxLength ? `${value.slice(0, maxLength).trimEnd()}…` : value
+}
 
-  router.push({
-    name: 'weather-community',
-    params: { cityId: `${selectedProvince.value.id}--${selectedDistrict.value}` },
-  })
+const formatRelativeTime = (value) => {
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60_000))
+
+  if (elapsedMinutes < 1) return '방금 전'
+  if (elapsedMinutes < 60) return `${elapsedMinutes}분 전`
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60)
+  if (elapsedHours < 24) return `${elapsedHours}시간 전`
+
+  return `${Math.floor(elapsedHours / 24)}일 전`
+}
+
+const loadCommunityPreview = async () => {
+  if (!communityRegionId.value) {
+    communityPreviewComments.value = []
+    return
+  }
+
+  communityPreviewLoading.value = true
+
+  try {
+    const comments = await getCommunityComments(communityRegionId.value)
+    communityPreviewComments.value = comments.slice(0, 1)
+  } catch {
+    communityPreviewComments.value = []
+  } finally {
+    communityPreviewLoading.value = false
+  }
+}
+
+const syncCommunityPreviewFromStorage = (event) => {
+  if (event.key !== COMMUNITY_PREVIEW_SYNC_KEY || !event.newValue) return
+
+  try {
+    const payload = JSON.parse(event.newValue)
+    if (payload?.cityId && payload.cityId === communityRegionId.value) {
+      loadCommunityPreview()
+    }
+  } catch {
+    // ignore invalid payload
+  }
 }
 
 const useMyLocation = () => {
@@ -277,24 +330,60 @@ const useMyLocation = () => {
     return
   }
 
+  const sequence = ++requestSequence
   isLocating.value = true
   navigator.geolocation.getCurrentPosition(
     async ({ coords }) => {
-      const sequence = ++requestSequence
+      const startedAt = performance.now()
+      if (sequence !== requestSequence) {
+        isLocating.value = false
+        return
+      }
       isLoading.value = true
+      errorMessage.value = ''
       try {
-        const result = await getCurrentWeather(coords.latitude, coords.longitude, '현재 위치')
-        if (sequence === requestSequence) weather.value = result
+        const geocodedLocation = await reverseCoordinates(coords.latitude, coords.longitude)
+        const nearestRegion = findNearestRegion(coords.latitude, coords.longitude, [
+          geocodedLocation?.local_names?.ko,
+          geocodedLocation?.name,
+        ])
+        const province = findProvinceById(nearestRegion?.provinceId)
+
+        if (!province || !nearestRegion || nearestRegion.distanceKm > 80) {
+          throw new Error('현재 위치에 해당하는 국내 시·군·구를 찾지 못했어요.')
+        }
+
+        selectedProvince.value = province
+        selectedDistrict.value = nearestRegion.district
+        hoveredRegion.value = null
+        selectedRegionAnchor.value = null
+        searchQuery.value = ''
+
+        const result = await getCurrentWeather(
+          coords.latitude,
+          coords.longitude,
+          nearestRegion.district,
+        )
+        await waitForMinimumLoading(startedAt)
+        if (sequence !== requestSequence) return
+        weather.value = result
+        addRecent(province, nearestRegion.district)
+        await loadCommunityPreview()
       } catch (error) {
-        errorMessage.value = error.message
+        await waitForMinimumLoading(startedAt)
+        if (sequence === requestSequence) errorMessage.value = error.message
       } finally {
         isLocating.value = false
-        isLoading.value = false
+        if (sequence === requestSequence) {
+          isLoading.value = false
+        }
       }
     },
     () => {
       isLocating.value = false
-      errorMessage.value = '위치를 확인하지 못했어요. 위치 권한을 확인해 주세요.'
+      if (sequence === requestSequence) {
+        errorMessage.value = '위치를 확인하지 못했어요. 위치 권한을 확인해 주세요.'
+      }
     },
     { enableHighAccuracy: false, timeout: 10000 },
   )
@@ -310,27 +399,27 @@ const handleSearchShortcut = (event) => {
 onMounted(() => {
   loadSearchIndex()
   document.addEventListener('keydown', handleSearchShortcut)
+  window.addEventListener('weather-home-reset', goNationwide)
+  window.addEventListener('storage', syncCommunityPreviewFromStorage)
 
-  const beginIntro = () => {
-    isTypographyReady.value = true
-    const introDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800
-    introTimer = window.setTimeout(() => {
-      isIntroComplete.value = true
-    }, introDelay)
-  }
+  communityPreviewTimer = window.setInterval(() => {
+    if (selectedProvince.value && selectedDistrict.value) {
+      loadCommunityPreview()
+    }
+  }, 15000)
 
-  if (document.fonts?.load) {
-    document.fonts
-      .load('800 48px "Noto Sans KR"', '어디의 날씨가 궁금하세요?')
-      .then(beginIntro, beginIntro)
-  } else {
-    beginIntro()
-  }
+  const introDelay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 800
+  introTimer = window.setTimeout(() => {
+    isIntroComplete.value = true
+  }, introDelay)
 })
 
 onUnmounted(() => {
   window.clearTimeout(introTimer)
+  window.clearInterval(communityPreviewTimer)
   document.removeEventListener('keydown', handleSearchShortcut)
+  window.removeEventListener('weather-home-reset', goNationwide)
+  window.removeEventListener('storage', syncCommunityPreviewFromStorage)
 })
 </script>
 
@@ -339,7 +428,6 @@ onUnmounted(() => {
     class="app-shell dashboard-home"
     :class="{
       'is-ready': isIntroComplete,
-      'is-typography-ready': isTypographyReady,
     }"
   >
     <section class="hero">
@@ -468,7 +556,6 @@ onUnmounted(() => {
             <span aria-hidden="true">←</span> 전국 지도
           </button>
         </div>
-        <!-- <p class="map-hint"><span aria-hidden="true">↗</span> 지역 위에 마우스를 올려보세요</p> -->
       </section>
 
       <aside
@@ -499,94 +586,141 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="weather" class="weather-content">
-          <div class="weather-heading">
-            <div>
+          <header class="weather-heading">
+            <div class="weather-heading-copy">
               <p>{{ selectedProvince?.name || '내 위치' }}</p>
               <h2>{{ weather.name }}</h2>
             </div>
-            <div v-if="selectedDistrict" class="weather-heading-actions">
-              <button class="detail-button" type="button" @click="openWeatherCommunity">
-                커뮤니티 <span aria-hidden="true">›</span>
-              </button>
-              <button
-                class="favorite-button"
-                type="button"
-                :aria-label="isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'"
-                @click="toggleFavorite"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
+
+            <button
+              class="favorite-button"
+              type="button"
+              :aria-label="isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'"
+              @click="toggleFavorite"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"
+                />
+              </svg>
+            </button>
+          </header>
 
           <div class="temperature-block">
-            <strong> {{ displayTemperature(weather.temp) }}<sup>°</sup> </strong>
-            <p class="weather-description">{{ weather.description }}</p>
+            <div class="temperature-line">
+              <strong>{{ displayTemperature(weather.temp) }}<sup>°</sup></strong>
+              <span class="weather-status">{{ weather.description }}</span>
+            </div>
+            <p class="weather-overview">{{ weatherOverview }}</p>
           </div>
 
-          <p class="weather-overview">{{ weatherOverview }}</p>
-
-          <div class="weather-message">
-            <span aria-hidden="true">
-              <svg viewBox="0 0 48 48">
-                <path
-                  d="M17 35h14M19 40h10M24 5c-8 0-14 6-14 14 0 6 3 9 7 13h14c4-4 7-7 7-13 0-8-6-14-14-14Z"
-                />
-                <path d="M24 1v-3M9 7 6 4m33 3 3-3M4 20H0m48 0h-4" />
+          <article class="weather-message">
+            <span class="weather-message-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M9 18h6" />
+                <path d="M10 22h4" />
+                <path d="M8.5 14.5a6 6 0 1 1 7 0c-1 .7-1.5 1.6-1.5 2.5h-4c0-.9-.5-1.8-1.5-2.5Z" />
               </svg>
             </span>
+
             <p>
-              <small>오늘의 한마디</small><strong>{{ weather.message }}</strong>
+              <small>오늘의 한마디</small>
+              <strong>{{ weather.message }}</strong>
             </p>
-          </div>
+          </article>
 
           <dl class="weather-metrics">
-            <div>
-              <dt>
-                <svg viewBox="0 0 32 32" aria-hidden="true">
-                  <path d="M13 5a3 3 0 0 1 6 0v13a7 7 0 1 1-6 0V5Z" />
-                  <path d="M16 10v12" />
+            <div class="weather-metric">
+              <span class="weather-metric-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 14V5" />
+                  <path d="M9 14.5a4 4 0 1 0 6 0V5a3 3 0 0 0-6 0Z" />
                 </svg>
-                <span>체감</span>
-              </dt>
-              <dd>{{ displayTemperature(weather.feelsLike) }}°</dd>
+              </span>
+              <div>
+                <dt>체감</dt>
+                <dd>{{ displayTemperature(weather.feelsLike) }}°</dd>
+              </div>
             </div>
-            <div>
-              <dt>
-                <svg viewBox="0 0 32 32" aria-hidden="true">
-                  <path d="M16 3S8 12 8 19a8 8 0 0 0 16 0c0-7-8-16-8-16Z" />
-                  <path d="M11 20c1 3 3 4 6 4" />
+
+            <div class="weather-metric">
+              <span class="weather-metric-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3s5 5.5 5 10a5 5 0 0 1-10 0c0-4.5 5-10 5-10Z" />
                 </svg>
-                <span>습도</span>
-              </dt>
-              <dd>{{ weather.humidity }}%</dd>
+              </span>
+              <div>
+                <dt>습도</dt>
+                <dd>{{ weather.humidity }}%</dd>
+              </div>
             </div>
-            <div>
-              <dt>
-                <svg viewBox="0 0 32 32" aria-hidden="true">
-                  <path
-                    d="M3 11h17c5 0 5-7 1-7-3 0-4 2-4 4M3 16h23c5 0 5 7 1 7-3 0-4-2-4-4M3 21h12"
-                  />
+
+            <div class="weather-metric">
+              <span class="weather-metric-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M3 8h10a2.5 2.5 0 1 0-2.5-2.5" />
+                  <path d="M3 12h15a2.5 2.5 0 1 1-2.5 2.5" />
+                  <path d="M3 16h7" />
                 </svg>
-                <span>바람</span>
-              </dt>
-              <dd>{{ weather.windSpeed }}m/s</dd>
+              </span>
+              <div>
+                <dt>바람</dt>
+                <dd>{{ weather.windSpeed }}m/s</dd>
+              </div>
             </div>
-            <div>
-              <dt>
-                <svg viewBox="0 0 32 32" aria-hidden="true">
-                  <path d="M8 23h16a5 5 0 0 0 0-10 8 8 0 0 0-15-2 6 6 0 0 0-1 12Z" />
-                  <path d="m11 27-1 2m6-2-1 2m6-2-1 2" />
+
+            <div class="weather-metric">
+              <span class="weather-metric-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M7 15a4 4 0 0 1 .8-7.9A5.5 5.5 0 0 1 18 9a3 3 0 0 1-1 5.8" />
+                  <path d="M9 18h.01" />
+                  <path d="M13 18h.01" />
+                  <path d="M17 18h.01" />
                 </svg>
-                <span>{{ weather.extraMetricLabel }}</span>
-              </dt>
-              <dd>{{ weather.extraMetricValue }}</dd>
+              </span>
+              <div>
+                <dt>{{ weather.extraMetricLabel }}</dt>
+                <dd>{{ weather.extraMetricValue }}</dd>
+              </div>
             </div>
           </dl>
+
+          <RouterLink
+            v-if="selectedProvince && selectedDistrict"
+            :to="communityPreviewLink"
+            class="community-preview"
+          >
+            <div class="community-preview-header">
+              <div>
+                <small>지역 커뮤니티</small>
+                <strong>{{ selectedDistrict }}의 지금 날씨 이야기</strong>
+              </div>
+
+              <span class="community-preview-link">
+                전체 보기
+                <span aria-hidden="true">›</span>
+              </span>
+            </div>
+
+            <article v-if="communityPreviewPost" class="community-preview-post">
+              <div class="community-preview-avatar" aria-hidden="true">
+                {{ (communityPreviewPost.nickname || '익명').slice(0, 1) }}
+              </div>
+
+              <div class="community-preview-content">
+                <strong>{{ truncateText(communityPreviewPost.content, 36) }}</strong>
+                <small
+                  >{{ communityPreviewPost.nickname || '익명' }} ·
+                  {{ formatRelativeTime(communityPreviewPost.createdAt) }}</small
+                >
+              </div>
+            </article>
+
+            <div v-else-if="!communityPreviewLoading" class="community-preview-empty">
+              <strong>아직 등록된 날씨 이야기가 없어요.</strong>
+              <span>{{ selectedDistrict }}의 첫 번째 날씨 이야기를 남겨보세요.</span>
+            </div>
+          </RouterLink>
 
           <p class="weather-update">{{ updatedTime }} 기준 · {{ weather.source }}</p>
         </div>
@@ -611,51 +745,59 @@ onUnmounted(() => {
             </svg>
           </div>
 
-          <div class="empty-copy">
-            <small>대한민국 날씨를 지도로 한눈에</small>
-            <strong>오늘, 어디의 하늘을 살펴볼까요?</strong>
-            <p>원하는 지역을 선택하시면 <br />현재의 날씨부터 생활 팁까지 보여드려요.</p>
-          </div>
+          <div class="empty-content-inner">
+            <div class="empty-top">
+              <div class="empty-top-copy">
+                <small>대한민국 날씨를 지도로 한눈에</small>
+                <strong>오늘, 어디의 하늘을 살펴볼까요?</strong>
+                <p>원하는 지역을 선택하시면 <br />현재의 날씨부터 생활 팁까지 보여드려요.</p>
+              </div>
 
-          <div class="empty-shortcuts">
-            <span>빠른 시작</span>
-            <div>
-              <button type="button" @click="openFeaturedRegion(featuredRegions[0])">
-                <svg viewBox="0 0 64 64" aria-hidden="true">
-                  <path
-                    d="M25 51h14M28 46h8l-1-18h-6l-1 18Zm2-24h4l-2-11-2 11Zm-6 29h16l3 5H21l3-5Z"
-                  />
-                  <path d="M27 34h10M28 40h8" />
+              <button
+                class="empty-location-button"
+                type="button"
+                :disabled="isLocating"
+                @click="useMyLocation"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 21s7-5.1 7-12a7 7 0 1 0-14 0c0 6.9 7 12 7 12Z" />
+                  <circle cx="12" cy="9" r="2.5" />
                 </svg>
-                <span>서울 <i aria-hidden="true"></i></span>
-              </button>
-              <button type="button" @click="openFeaturedRegion(featuredRegions[1])">
-                <svg viewBox="0 0 64 64" aria-hidden="true">
-                  <path
-                    d="M8 45h48M13 45V25m38 20V25M13 32c8 0 14-5 19-13 5 8 11 13 19 13M20 45V31m12 14V20m12 25V31"
-                  />
-                  <path d="M8 50h48" />
-                </svg>
-                <span>부산 <i aria-hidden="true"></i></span>
-              </button>
-              <button type="button" @click="openFeaturedRegion(featuredRegions[2])">
-                <svg class="jeju-icon" viewBox="0 0 64 64" aria-hidden="true">
-                  <path d="m9 49 15-28 8 6 8-6 15 28Z" />
-                  <path d="m24 21 8 6 8-6 4 8c-5-2-8 0-12 2-4-2-7-4-12-2Z" />
-                </svg>
-                <span>제주 <i aria-hidden="true"></i></span>
+                <span>{{ isLocating ? '현재 지역을 찾고 있어요…' : '내 위치로 바로 보기' }}</span>
+                <span class="empty-button-arrow" aria-hidden="true">›</span>
               </button>
             </div>
-          </div>
 
-          <button class="empty-location-button" type="button" @click="useMyLocation">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 21s7-5.1 7-12a7 7 0 1 0-14 0c0 6.9 7 12 7 12Z" />
-              <circle cx="12" cy="9" r="2.5" />
-            </svg>
-            <span>내 위치로 바로 보기</span>
-            <span class="empty-button-arrow" aria-hidden="true">›</span>
-          </button>
+            <div class="empty-shortcuts">
+              <div>
+                <button type="button" @click="openFeaturedRegion(featuredRegions[0])">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                    <path
+                      d="M25 51h14M28 46h8l-1-18h-6l-1 18Zm2-24h4l-2-11-2 11Zm-6 29h16l3 5H21l3-5Z"
+                    />
+                    <path d="M27 34h10M28 40h8" />
+                  </svg>
+                  <span>서울 <i aria-hidden="true"></i></span>
+                </button>
+                <button type="button" @click="openFeaturedRegion(featuredRegions[1])">
+                  <svg viewBox="0 0 64 64" aria-hidden="true">
+                    <path
+                      d="M8 45h48M13 45V25m38 20V25M13 32c8 0 14-5 19-13 5 8 11 13 19 13M20 45V31m12 14V20m12 25V31"
+                    />
+                    <path d="M8 50h48" />
+                  </svg>
+                  <span>부산 <i aria-hidden="true"></i></span>
+                </button>
+                <button type="button" @click="openFeaturedRegion(featuredRegions[2])">
+                  <svg class="jeju-icon" viewBox="0 0 64 64" aria-hidden="true">
+                    <path d="m9 49 15-28 8 6 8-6 15 28Z" />
+                    <path d="m24 21 8 6 8-6 4 8c-5-2-8 0-12 2-4-2-7-4-12-2Z" />
+                  </svg>
+                  <span>제주 <i aria-hidden="true"></i></span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </aside>
     </div>
@@ -665,9 +807,7 @@ onUnmounted(() => {
       <span class="weather-sources">
         <a href="https://www.weather.go.kr/" target="_blank" rel="noreferrer">기상청</a>
         <span>·</span>
-        <a href="https://openweathermap.org/" target="_blank" rel="noreferrer"
-          >OpenWeather fallback</a
-        >
+        <a href="https://openweathermap.org/" target="_blank" rel="noreferrer">OpenWeather</a>
       </span>
     </footer>
   </main>

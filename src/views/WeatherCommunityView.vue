@@ -13,6 +13,7 @@ import {
 import { getWeatherForRegion } from '../services/openWeather'
 
 const NICKNAME_KEY = 'oneul-weather-community-nickname'
+const COMMUNITY_PREVIEW_SYNC_KEY = 'onul-weather-community-sync'
 const quickMessages = ['생각보다 더워요', '바람이 세요', '우산이 필요해요', '산책하기 좋아요']
 
 const route = useRoute()
@@ -120,6 +121,10 @@ const submitComment = async () => {
       weatherObservedAt: weather.value.observedAt.toISOString(),
     })
     localStorage.setItem(NICKNAME_KEY, cleanNickname)
+    localStorage.setItem(
+      COMMUNITY_PREVIEW_SYNC_KEY,
+      JSON.stringify({ cityId: regionId.value, createdAt: Date.now() }),
+    )
     comments.value = [created, ...comments.value]
     commentText.value = ''
     commentPassword.value = ''
@@ -228,7 +233,7 @@ watch(
     </section>
 
     <template v-else>
-      <section class="community-hero">
+      <section class="community-dashboard">
         <div class="community-weather-summary">
           <div>
             <span>{{ province.name }}</span>
@@ -254,15 +259,6 @@ watch(
           </dl>
         </div>
 
-        <div class="community-intro">
-          <p>LIVE WEATHER COMMUNITY</p>
-          <h1>{{ district }} 날씨 커뮤니티</h1>
-          <strong>숫자만으로는 알기 어려운 지금의 날씨를 나눠보세요.</strong>
-          <span>작성한 글에는 현재 기온과 날씨가 함께 기록됩니다.</span>
-        </div>
-      </section>
-
-      <div class="community-layout">
         <aside class="community-composer" aria-labelledby="composer-title">
           <div class="community-section-heading">
             <span>지금 현장은 어떤가요?</span>
@@ -290,8 +286,8 @@ watch(
             <textarea
               v-model="commentText"
               maxlength="300"
-              rows="5"
-              :placeholder="`지금 ${district}의 날씨를 직접 느낀 그대로 알려주세요.`"
+              rows="2"
+              :placeholder="`지금 ${district}의 날씨를 느낀 그대로 알려주세요.`"
               @input="submitError = ''"
             />
             <small>{{ commentText.length }}/300</small>
@@ -439,7 +435,7 @@ watch(
             </li>
           </ol>
         </section>
-      </div>
+      </section>
     </template>
   </main>
 </template>

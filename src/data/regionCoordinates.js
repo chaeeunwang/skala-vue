@@ -254,3 +254,41 @@ export const regionCoordinates = {
 
 export const getRegionCoordinates = (provinceId, district) =>
   regionCoordinates[provinceId + ':' + district] ?? null
+
+const toRadians = (value) => (value * Math.PI) / 180
+
+const getDistanceKm = (lat, lon, targetLat, targetLon) => {
+  const earthRadiusKm = 6371
+  const latitudeDelta = toRadians(targetLat - lat)
+  const longitudeDelta = toRadians(targetLon - lon)
+  const startLatitude = toRadians(lat)
+  const endLatitude = toRadians(targetLat)
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(startLatitude) * Math.cos(endLatitude) * Math.sin(longitudeDelta / 2) ** 2
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+}
+
+export const findNearestRegion = (lat, lon, localityNames = []) => {
+  const regions = Object.entries(regionCoordinates).map(([regionId, coordinates]) => {
+    const separatorIndex = regionId.indexOf(':')
+    return {
+      provinceId: regionId.slice(0, separatorIndex),
+      district: regionId.slice(separatorIndex + 1),
+      coordinates,
+    }
+  })
+  const koreanLocalities = localityNames
+    .map((name) => String(name || '').trim())
+    .filter((name) => /[가-힣]{2,}/.test(name))
+  const localityMatches = regions.filter((region) =>
+    koreanLocalities.some((name) => region.district.startsWith(name)),
+  )
+  const candidates = localityMatches.length ? localityMatches : regions
+
+  return candidates.reduce((nearest, region) => {
+    const distanceKm = getDistanceKm(lat, lon, ...region.coordinates)
+    return !nearest || distanceKm < nearest.distanceKm ? { ...region, distanceKm } : nearest
+  }, null)
+}
