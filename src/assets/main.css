@@ -4231,6 +4231,10 @@ footer a {
   object-fit: contain;
   object-position: center top;
 
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+
   transform: translateX(-50%);
 
   /*

@@ -31,7 +31,11 @@
 <template>
   <main class="about-visual-page">
     <div class="about-visual">
-      <img src="/src/assets/community-map.png" alt="지도 기반 날씨 커뮤니티 서비스 화면" />
+      <img
+        src="/src/assets/community-map.png"
+        alt="지도 기반 날씨 커뮤니티 서비스 화면"
+        draggable="false"
+      />
     </div>
   </main>
 </template>
