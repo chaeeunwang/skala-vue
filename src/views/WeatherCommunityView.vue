@@ -46,6 +46,7 @@ const commentCountLabel = computed(() =>
 )
 
 const parseRegion = (cityId) => {
+  // 라우트에는 provinceId--district 형식을 사용해 이름이 같은 구역을 구분한다.
   const separatorIndex = cityId.indexOf('--')
   const provinceId = separatorIndex > 0 ? cityId.slice(0, separatorIndex) : ''
   const districtName = separatorIndex > 0 ? cityId.slice(separatorIndex + 2) : ''
@@ -82,6 +83,7 @@ const loadCommunity = async (cityId) => {
   }
 
   isLoading.value = true
+  // 날씨와 댓글은 서로 독립적이므로 동시에 요청해 초기 표시 시간을 줄인다.
   const commentsPromise = loadComments()
   try {
     weather.value = await getWeatherForRegion(parsed.district, parsed.province)
@@ -201,6 +203,7 @@ const removeComment = async (comment) => {
 }
 
 const formatRelativeTime = (value) => {
+  // 서버 시각을 기준으로 목록을 다시 가져오지 않아도 화면에서 상대 시간을 계산한다.
   const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60_000))
   if (elapsedMinutes < 1) return '방금 전'
   if (elapsedMinutes < 60) return `${elapsedMinutes}분 전`

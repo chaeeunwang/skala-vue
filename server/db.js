@@ -13,6 +13,7 @@ export const getSupabase = () => {
   }
 
   if (!supabase) {
+    // 서버리스 인스턴스가 재사용되는 동안 클라이언트를 한 번만 생성한다.
     supabase = createClient(supabaseUrl, supabaseSecretKey, {
       auth: {
         persistSession: false,

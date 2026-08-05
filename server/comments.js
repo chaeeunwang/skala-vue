@@ -89,6 +89,7 @@ const validatePassword = (value) => {
 }
 
 const hashPassword = async (password, salt = randomBytes(16).toString('hex')) => {
+  // 원문 비밀번호는 저장하지 않고 댓글마다 다른 salt로 파생 키를 만든다.
   const key = await derivePasswordKey(password, salt, 32)
 
   return {
@@ -107,6 +108,7 @@ const passwordMatches = async (password, storedHash, storedSalt) => {
   const actual = Buffer.from(hash, 'hex')
   const expected = Buffer.from(storedHash.trim(), 'hex')
 
+  // 비교 시간으로 해시 값을 추측하기 어렵도록 상수 시간 비교를 사용한다.
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
@@ -198,6 +200,7 @@ const createComment = async (request, response) => {
 
   const passwordCredential = await hashPassword(password)
 
+  // 익명 기기 한 곳에서 1분에 3개를 초과해 등록하는 것을 막는다.
   const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString()
 
   const supabase = getSupabase()

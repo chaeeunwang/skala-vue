@@ -94,6 +94,13 @@ npm run lint
 - Vercel 배포를 기준으로 구성되어 있으며, `vercel.json`에서 SPA 라우팅을 위한 rewrite 설정을 사용합니다.
 - 프론트엔드 배포와 함께 서버 API 환경 변수가 올바르게 주입되어야 커뮤니티 기능이 정상 동작합니다.
 
+## 제출 전 셀프 코드리뷰
+
+- **단일 책임:** 공통 UI와 API 호출은 컴포넌트·서비스로 분리했지만, `WeatherHomeView`가 지도·검색·저장 목록·날씨·커뮤니티 미리보기 상태를 함께 관리하고 있어 기능별 컴포저블로 더 나눌 여지가 있습니다.
+- **반응형 남용:** 화면에 즉시 반영되어야 하는 선택 지역, 날씨, 검색어, 로딩·에러 상태에만 `ref`와 `computed`를 사용하고, 상수와 일회성 계산값은 일반 값으로 유지했습니다.
+- **로딩·에러 처리:** 날씨와 커뮤니티 API 요청 중에는 로딩 상태를, 실패 시에는 원인 또는 재시도 안내 메시지를 화면에 표시하도록 처리했습니다.
+- **이름의 명확성:** `loadWeather`, `loadComments`, `selectDistrict`, `isCommentsLoading`처럼 변수·함수 이름만으로 역할과 상태를 파악할 수 있도록 동사와 상태 접두사를 일관되게 사용했습니다.
+
 ## 개발 팁
 
 - IDE는 [VS Code](https://code.visualstudio.com/)와 [Vue Official 확장](https://marketplace.visualstudio.com/items?itemName=Vue.volar)을 권장합니다.

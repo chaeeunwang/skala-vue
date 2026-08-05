@@ -120,6 +120,7 @@ const weatherOverview = computed(() => {
 })
 
 const loadSearchIndex = async () => {
+  // 지도 SVG의 path id를 검색 후보로 사용해 지도 데이터와 검색 목록을 한곳에서 관리한다.
   const groups = await Promise.all(
     provinces.map(async (province) => {
       try {
@@ -203,11 +204,13 @@ const updateActivePosition = (region) => {
 }
 
 const waitForMinimumLoading = async (startedAt) => {
+  // 로딩 UI가 너무 짧게 깜빡이지 않도록 최소 노출 시간을 보장한다.
   const remaining = MIN_WEATHER_LOADING_MS - (performance.now() - startedAt)
   if (remaining > 0) await new Promise((resolve) => window.setTimeout(resolve, remaining))
 }
 
 const loadWeather = async (province, district) => {
+  // 연속 선택 시 가장 마지막 요청만 화면 상태를 변경하도록 요청 순번을 기록한다.
   const sequence = ++requestSequence
   const startedAt = performance.now()
   isLoading.value = true
@@ -311,6 +314,7 @@ const loadCommunityPreview = async () => {
 }
 
 const syncCommunityPreviewFromStorage = (event) => {
+  // 다른 탭에서 작성된 글도 현재 지역의 미리보기에 반영한다.
   if (event.key !== COMMUNITY_PREVIEW_SYNC_KEY || !event.newValue) return
 
   try {
@@ -319,7 +323,7 @@ const syncCommunityPreviewFromStorage = (event) => {
       loadCommunityPreview()
     }
   } catch {
-    // ignore invalid payload
+    // 다른 코드가 같은 저장소 키를 잘못 덮어쓴 경우에는 동기화만 건너뛴다.
   }
 }
 
@@ -330,6 +334,7 @@ const useMyLocation = () => {
     return
   }
 
+  // 위치 확인 도중 사용자가 다른 지역을 고르면 늦게 도착한 위치 결과를 무시한다.
   const sequence = ++requestSequence
   isLocating.value = true
   navigator.geolocation.getCurrentPosition(
@@ -403,6 +408,7 @@ onMounted(() => {
   window.addEventListener('storage', syncCommunityPreviewFromStorage)
 
   communityPreviewTimer = window.setInterval(() => {
+    // 같은 탭에서 다른 사용자가 작성한 최신 글도 주기적으로 갱신한다.
     if (selectedProvince.value && selectedDistrict.value) {
       loadCommunityPreview()
     }

@@ -15,6 +15,7 @@ const getServiceKey = () => {
 }
 
 const toGrid = (lat, lon) => {
+  // 기상청 단기예보 API가 사용하는 Lambert Conformal Conic 격자로 변환한다.
   const earthRadius = 6371.00877
   const gridSize = 5.0
   const standardLatitude1 = 30.0
@@ -71,6 +72,7 @@ const getKoreaTimeParts = (date) => {
 
 const getBaseDateTime = (now = new Date()) => {
   const current = getKoreaTimeParts(now)
+  // 매시 30분 발표 자료는 약 15분 뒤 제공되므로 45분 전에는 이전 발표를 조회한다.
   const availableBaseDate =
     Number(current.minute) < 45 ? new Date(now.getTime() - 60 * 60 * 1000) : now
   const base = getKoreaTimeParts(availableBaseDate)
@@ -120,6 +122,7 @@ const requestForecast = async (lat, lon) => {
 }
 
 const getNearestForecast = (items) => {
+  // 카테고리별 행을 발표 시각 단위 객체로 묶은 뒤 현재와 가장 가까운 예보를 고른다.
   const grouped = new Map()
 
   items.forEach((item) => {
@@ -162,6 +165,7 @@ const getMessage = (temp, precipitationType, windSpeed) => {
 }
 
 const getFeelsLike = (temp, humidity, windSpeed) => {
+  // 저온에서는 체감온도, 고온다습한 환경에서는 열지수 공식을 적용한다.
   if (temp <= 10 && windSpeed > 1.3) {
     const windKph = windSpeed * 3.6
     return Math.round(

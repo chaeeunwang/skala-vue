@@ -3,6 +3,7 @@ import axios from 'axios'
 const DEVICE_KEY = 'oneul-weather-community-device'
 
 const getAuthorToken = () => {
+  // 로그인 없이도 서버에서 기기별 작성 빈도를 제한할 수 있도록 익명 식별자를 유지한다.
   let token = localStorage.getItem(DEVICE_KEY)
   if (!token) {
     token = crypto.randomUUID()

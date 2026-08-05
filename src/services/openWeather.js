@@ -134,11 +134,13 @@ export const getCurrentWeather = async (lat, lon, locationName) => {
   try {
     return await getKmaCurrentWeather(lat, lon, locationName)
   } catch {
+    // 기상청 요청이 실패해도 날씨 화면을 제공할 수 있도록 보조 API로 대체한다.
     return getOpenWeatherCurrentWeather(lat, lon, locationName)
   }
 }
 
 export const getWeatherForRegion = async (district, province) => {
+  // 준비된 행정구역 중심 좌표를 우선 사용해 지오코딩 호출 횟수를 줄인다.
   const coordinates = getRegionCoordinates(province.id, district)
 
   if (coordinates) {

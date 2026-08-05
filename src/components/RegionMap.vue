@@ -2,6 +2,7 @@
 import { nextTick, ref, watch } from 'vue'
 
 const DOKDO_GEOMETRY = {
+  // 원본 행정구역 SVG에 빠진 도서 영역을 해당 지역 path에 합칠 좌표다.
   '전국_시도_경계.svg': {
     region: '경상북도',
     path: ' M 743.5 164 L 746.2 160.8 L 749.6 162.4 L 749 166.3 L 745.6 167.2 Z M 752 169.2 L 754.4 167 L 757 168.7 L 756.1 171.8 L 753 172.1 Z',
@@ -25,6 +26,7 @@ const mapRoot = ref(null)
 const loadError = ref('')
 
 const getAnchor = (path) => {
+  // 툴팁이 지도 바깥으로 잘리지 않도록 좌우 여백에 따라 표시 방향을 정한다.
   const rootRect = mapRoot.value.getBoundingClientRect()
   const pathRect = path.getBoundingClientRect()
   const tooltipSpace = 112
@@ -63,6 +65,7 @@ const enhanceMap = async () => {
   await nextTick()
   const paths = [...(mapRoot.value?.querySelectorAll('path[id]') ?? [])]
 
+  // 외부 SVG에도 키보드 탐색과 스크린리더용 속성을 동적으로 추가한다.
   paths.forEach((path) => {
     path.setAttribute('tabindex', props.compact ? '-1' : '0')
     path.setAttribute('role', 'button')
@@ -91,6 +94,7 @@ const loadMap = async () => {
     const documentNode = new DOMParser().parseFromString(text, 'image/svg+xml')
     const svg = documentNode.documentElement
     const dokdo = DOKDO_GEOMETRY[props.file]
+    // 별도 path를 만들지 않고 부모 지역에 좌표를 합쳐 기존 이벤트 위임을 유지한다.
     const parentRegion = dokdo && svg.querySelector(`path[id="${dokdo.region}"]`)
     if (parentRegion)
       parentRegion.setAttribute('d', `${parentRegion.getAttribute('d')}${dokdo.path}`)
